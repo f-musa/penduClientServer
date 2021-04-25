@@ -27,3 +27,14 @@ void init_sockaddr_in(struct sockaddr_in * , unsigned short , char * );
    @return la socket initialisée, quitte le programme en cas d'échec.
 */
 int initialiser_socket(char * , unsigned short, struct sockaddr_in *);
+
+
+/** 
+  Affiche l'etat du jeu a partir des donnees reçus en argument
+ 
+ 
+ 
+ 
+ 
+ **/
+void displayGameState(void * data);

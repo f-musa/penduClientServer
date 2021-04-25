@@ -12,6 +12,5 @@ int initialiser_socket(char * ip_serveur, unsigned short port_serveur, struct so
    if (sock = socket(AF_INET, SOCK_DGRAM, 0) < 0) {
       perror("Erreur lors de la création de socket UDP");
    }
-   return sock;   
+   return sock;
 }
-
