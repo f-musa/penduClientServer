@@ -1,5 +1,5 @@
 #include "client.h"
-
+#define BUFFER_SIZE 100
 void do_or_exit(int result, const char * erreur){
   if(result < 0){
     perror(erreur);
@@ -31,16 +31,17 @@ int initialiser_socket(char * ip_serveur, short port_serveur,
 
   return sock;
 }
-
-void echange_avec_serveur(struct sockaddr_in serveur, struct sockaddr_in moi, int sock){
-  char message[1024] = "Wesh mon gars le serveur, ça dit quoi ?";
-  char reponse[30];
-    
-  write(sock, message, strlen(message)+1),
-    
-  read(sock, reponse, 30);
-    printf("client (%s,%4d) recoit de ", inet_ntoa(moi.sin_addr),ntohs(moi.sin_port));
-  printf("(%s,%4d) : \"%s\" \n", inet_ntoa(serveur.sin_addr), ntohs(serveur.sin_port), reponse);
+char  tour_partie(char *mot_trouve,int tentatives_restantes)
+{
+  char c;
+  printf("****************************Jeu du Pendu****************************\n");
+  printf("Mot:\t%s\n",mot_trouve);
+  printf("Tentatives restantes:\t%d\n",tentatives_restantes);
+  printf("Proposer une lettre : ");
+  scanf(" %c",&c);
+  getchar();//On elimine le retour chariot
+  printf("\n");
+  return c;
 }
 
 int main(int argc , char ** argv)
@@ -61,10 +62,42 @@ int main(int argc , char ** argv)
     
     printf("Connexion au serveur: %d\n", port_serveur);
     sock = initialiser_socket(ip_serveur, port_serveur, &moi, &serveur);
-    while(1){
-          echange_avec_serveur(serveur, moi, sock);
-           sleep(2);
+    char statut_partie[3];
+    do
+    {
+      char mot_trouve [BUFFER_SIZE];
+      char tentatives_restantes[3];
+      int taille = 0;
+      //On recupere l'etat du jeu avant de l'afficher
+      do_or_exit(recv(sock,&taille,sizeof(taille),0),"Erreur Recv");
+      do_or_exit(recv(sock,mot_trouve,taille,0),"Erreur Recv");
+      do_or_exit(recv(sock,&taille,sizeof(taille),0),"Erreur Recv");        
+      do_or_exit(recv(sock,tentatives_restantes,taille,0),"Erreur recv");
+      char c;
+      c = tour_partie(mot_trouve,atoi(tentatives_restantes));
+      // On envoie au serveur le charactere propose
+                    
+      send(sock,&c,sizeof(char),0);
+      
+      //On recupere l'etat de la partie
+      do_or_exit(recv(sock,&taille,sizeof(taille),0),"Erreur Recv");
+      do_or_exit(recv(sock,&statut_partie,taille,0),"Erreur Recv");
+      system("clear");
+    }while(strcmp(statut_partie,"0")==0);
+    
+    //Si la partie est termine
+    if(strcmp(statut_partie,"1")==0 || strcmp(statut_partie,"2")==0)
+    {
+      system("clear");
+      int taille = 0;
+      char mot_cherche [BUFFER_SIZE];
+      do_or_exit(recv(sock,&taille,sizeof(taille),0),"Erreur Recv");
+      do_or_exit(recv(sock,&mot_cherche,taille,0),"Erreur Recv");
+      strcmp(statut_partie,"1")==0 ? printf("Le mot etait : %s \nVous avez gagne !\n",mot_cherche) 
+                                   : printf("Le mot etait : %s \nVous avez perdu !\n",mot_cherche) 
+      ;
     }
+    
     close(sock);
      
   return EXIT_SUCCESS;
