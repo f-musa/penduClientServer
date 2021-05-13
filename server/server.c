@@ -19,6 +19,8 @@ int sock_ecoute;
 
 pthread_mutex_t verrou;
 
+int continuer_serveur;
+
 void do_or_exit(int result, const char * erreur) {
   if (result < 0) {
     perror(erreur);
@@ -68,13 +70,13 @@ void nouvelle_partie(Partie * p) {
   }
   mot_trouve[strlen(p->mot_cherche)] = '\0';
   printf("Partie en cours avec le client : %s \n",inet_ntoa(p->info_joueur.sin_addr));
-  while(p->statut_partie == 0)
+  while(p->statut_partie == 0 && continuer_serveur)
   {
       char c;
       //on envoie l'etat du jeu au client
       envoyer_etat_jeu(p,mot_trouve);
       // On recupere le charactere propose par le client
-      do_or_exit(recv(p->socket,&c,sizeof(char),0),"Erreur Recv");
+      do_or_exit(recv(p->socket,&c,sizeof(char),0),"Erreur Recv" );
       
       // Si la lettre figure dans le mot et n'a pas precedemment ete propose on l'ajoute aux lettre trouvees
       if(strchr(p->mot_cherche,c)!=NULL && strchr(p->lettres_trouvees,c)==NULL)
@@ -107,6 +109,10 @@ void nouvelle_partie(Partie * p) {
         p->statut_partie = 1;
       else if(p->tentative_restantes == 0)
         p->statut_partie = 2;
+      // sinon avant de continuer la partie on verifie que l'arret du serveur n'a pas ete demande
+      // dans ce cas on signale au client de sauvegarder la partie (statut 3)
+      else if (continuer_serveur == 0)
+        p->statut_partie = 3;
 
       //Envoie du statut de la partie au client
       char  converti [3];
@@ -124,10 +130,7 @@ void nouvelle_partie(Partie * p) {
       }
    
 }
-void detruire_partie(void * p)
-{
-  ;
-}
+
 void * creer_th(void * arg) {
   char buff[BUFFER_SIZE];
   Partie * p = (Partie * ) arg;
@@ -138,7 +141,8 @@ void * creer_th(void * arg) {
   pthread_mutex_lock(&verrou);
   NB_PARTIE--;
   pthread_mutex_unlock(&verrou);
-  detruire_partie(arg);
+  free(p->mot_cherche);
+  free(arg);
 }
 
 Partie * init_partie(int sock) {
@@ -172,6 +176,11 @@ Partie * init_partie(int sock) {
   return p;
 }
 
+void  set_continuer(int signal)
+{
+  continuer_serveur = 0;  
+}
+
 int main(int argc, char ** argv) {
   struct sockaddr_in serveur;
   struct sockaddr_in client;
@@ -180,8 +189,12 @@ int main(int argc, char ** argv) {
   short port = 0;
   char buffer[255];
   sock_ecoute = 0;
+  continuer_serveur = 1;
   
-
+  struct sigaction s;
+  s.sa_handler = set_continuer;
+  sigaction(SIGINT, &s,0);
+  
   pthread_t ths[MAX_THREAD];
   pthread_mutex_init( & verrou, NULL);
   NB_PARTIE = 0;
@@ -197,15 +210,18 @@ int main(int argc, char ** argv) {
   do_or_exit(listen(sock_ecoute, 30), "Erreur listen");
   printf("En attente de connexion\n");
 
-  while (1) {
+  while (continuer_serveur) {
     if(NB_PARTIE<MAX_THREAD)
     {
     sock_comm = accept(sock_ecoute, (struct sockaddr * ) & client, (socklen_t * ) & taille_serveur);
+    if(sock_comm!=-1)
+    {
     printf("Connexion acceptée: (%s,%4d)\n", inet_ntoa(serveur.sin_addr), ntohs(serveur.sin_port));
     Partie * p = init_partie(sock_comm);
     pthread_create(&ths[NB_PARTIE], NULL, creer_th, p);
     NB_PARTIE++;
     sleep(5);
+    }
     }
     else 
     {
@@ -213,6 +229,8 @@ int main(int argc, char ** argv) {
     sleep(5);
     }    
   }
+  close(sock_ecoute);
+  printf("Sauvegrade des parties en cours et arret du serveur ..\n");
   int i;
   for (i = 0; i < NB_PARTIE; ++i) 
         pthread_join(ths[i], NULL);

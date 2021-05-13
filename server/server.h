@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <netdb.h> 
 #include <pthread.h>
+#include <signal.h>
 
 /**
    Initialise la structure sockaddr_in pour que la socket qui y sera liée
