@@ -2,17 +2,6 @@
 #define BUFFER_SIZE 100
 #define MAX_THREAD 4
 
-typedef struct partie
-{
-	char *mot_cherche;
-	char lettres_trouvees[27];
-	int tentative_restantes;
-	int statut_partie;
-	int socket;
-	struct sockaddr_in info_joueur;
-}
-Partie;
-
 int NB_PARTIE;
 
 int sock_ecoute;
@@ -188,11 +177,11 @@ void nouvelle_partie(Partie *p)
 		do_or_exit(send(p->socket, &taille, sizeof(taille), 0), "Erreur send");
 		do_or_exit(send(p->socket, p->mot_cherche, taille, 0), "Erreur send");
 	}
+  free(mot_trouve);
 }
 
 void *creer_th(void *arg)
 {
-	char buff[BUFFER_SIZE];
 	Partie *p = (Partie*) arg;
 	int sock = p->socket;
 	nouvelle_partie(p);
@@ -203,6 +192,7 @@ void *creer_th(void *arg)
 	pthread_mutex_unlock(&verrou);
 	free(p->mot_cherche);
 	free(arg);
+  return 0;
 }
 
 Partie* init_partie(int sock)
@@ -248,10 +238,8 @@ int main(int argc, char **argv)
 {
 	struct sockaddr_in serveur;
 	struct sockaddr_in client;
-	char message[BUFFER_SIZE];
 	int taille_serveur = sizeof(serveur);
 	short port = 0;
-	char buffer[255];
 	sock_ecoute = 0;
 	continuer_serveur = 1;
 
@@ -272,7 +260,7 @@ int main(int argc, char **argv)
 
 	int sock_comm;
 	//Le serveur ecoute et attend de nouvelles connexion
-	do_or_exit(listen(sock_ecoute, 30), "Erreur listen");
+	do_or_exit(listen(sock_ecoute, 10), "Erreur listen");
 	printf("En attente de connexion\n");
 
 	while (continuer_serveur)
